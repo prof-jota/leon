@@ -322,49 +322,85 @@
             if(!audioContext) return;
             
             const ctx = audioContext;
-            const duration = 2.0;
+            const duration = 3.0; // Rugido um pouco mais longo
 
-            // 1. Oscilador para o som grave (Sawtooth)
-            const osc = ctx.createOscillator();
-            osc.type = 'sawtooth';
-            // Frequência caindo rapidamente para simular o rugido gutural
-            osc.frequency.setValueAtTime(90, ctx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(30, ctx.currentTime + 1.5);
+            // Ganho Mestre (Master Gain) configurado bem alto para impacto e leve distorção (clipping)
+            const masterGain = ctx.createGain();
+            masterGain.gain.value = 2.5; 
+            masterGain.connect(ctx.destination);
 
-            const oscGain = ctx.createGain();
-            oscGain.gain.setValueAtTime(0, ctx.currentTime);
-            oscGain.gain.linearRampToValueAtTime(2.0, ctx.currentTime + 0.1); // Attack
-            oscGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration); // Decay
-
-            osc.connect(oscGain).connect(ctx.destination);
+            // 1. Sub-grave / Impacto no peito (Onda Triângulo)
+            const subOsc = ctx.createOscillator();
+            subOsc.type = 'triangle';
+            subOsc.frequency.setValueAtTime(80, ctx.currentTime);
+            subOsc.frequency.exponentialRampToValueAtTime(20, ctx.currentTime + duration);
             
-            // 2. Ruído (White Noise) filtrado para adicionar textura de respiração/rasgado
+            const subGain = ctx.createGain();
+            subGain.gain.setValueAtTime(0, ctx.currentTime);
+            subGain.gain.linearRampToValueAtTime(2.0, ctx.currentTime + 0.05); // Ataque rápido para impacto
+            subGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
+            
+            subOsc.connect(subGain).connect(masterGain);
+            subOsc.start(ctx.currentTime);
+            subOsc.stop(ctx.currentTime + duration);
+
+            // 2. Rosnado Feroz e Agudo (Onda Sawtooth)
+            const sawOsc = ctx.createOscillator();
+            sawOsc.type = 'sawtooth';
+            sawOsc.frequency.setValueAtTime(120, ctx.currentTime);
+            sawOsc.frequency.exponentialRampToValueAtTime(35, ctx.currentTime + 1.0);
+            sawOsc.frequency.linearRampToValueAtTime(30, ctx.currentTime + duration);
+            
+            const sawGain = ctx.createGain();
+            sawGain.gain.setValueAtTime(0, ctx.currentTime);
+            sawGain.gain.linearRampToValueAtTime(2.0, ctx.currentTime + 0.1);
+            sawGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
+            
+            sawOsc.connect(sawGain).connect(masterGain);
+            sawOsc.start(ctx.currentTime);
+            sawOsc.stop(ctx.currentTime + duration);
+
+            // 3. Textura Rasgada da Garganta (Onda Square desafinada)
+            const sqOsc = ctx.createOscillator();
+            sqOsc.type = 'square';
+            sqOsc.frequency.setValueAtTime(105, ctx.currentTime);
+            sqOsc.frequency.exponentialRampToValueAtTime(32, ctx.currentTime + 1.2);
+            
+            const sqGain = ctx.createGain();
+            sqGain.gain.setValueAtTime(0, ctx.currentTime);
+            sqGain.gain.linearRampToValueAtTime(1.5, ctx.currentTime + 0.08);
+            sqGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
+            
+            sqOsc.connect(sqGain).connect(masterGain);
+            sqOsc.start(ctx.currentTime);
+            sqOsc.stop(ctx.currentTime + duration);
+
+            // 4. Ar / Respiração agressiva (White Noise com sweep de Filtro)
             const bufferSize = ctx.sampleRate * duration;
             const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
             const output = noiseBuffer.getChannelData(0);
             for (let i = 0; i < bufferSize; i++) {
-                output[i] = Math.random() * 2 - 1;
+                output[i] = Math.random() * 2 - 1; // Ruído branco
             }
             
             const noiseSrc = ctx.createBufferSource();
             noiseSrc.buffer = noiseBuffer;
             
+            // Filtro dinâmico: Simula a boca abrindo e fechando (efeito formante)
             const noiseFilter = ctx.createBiquadFilter();
             noiseFilter.type = 'lowpass';
-            noiseFilter.frequency.setValueAtTime(600, ctx.currentTime);
-            noiseFilter.frequency.linearRampToValueAtTime(100, ctx.currentTime + duration);
-
+            noiseFilter.frequency.setValueAtTime(300, ctx.currentTime); // Começa abafado
+            noiseFilter.frequency.linearRampToValueAtTime(1500, ctx.currentTime + 0.2); // Boca abre, som rasga
+            noiseFilter.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + duration); // Morre devagar
+            noiseFilter.Q.value = 2.5; // Adiciona ressonância e aspereza
+            
             const noiseGain = ctx.createGain();
             noiseGain.gain.setValueAtTime(0, ctx.currentTime);
-            noiseGain.gain.linearRampToValueAtTime(1.5, ctx.currentTime + 0.1);
+            noiseGain.gain.linearRampToValueAtTime(3.0, ctx.currentTime + 0.15);
             noiseGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
 
-            noiseSrc.connect(noiseFilter).connect(noiseGain).connect(ctx.destination);
-
-            // Tocar ambos
-            osc.start(ctx.currentTime);
+            noiseSrc.connect(noiseFilter).connect(noiseGain).connect(masterGain);
             noiseSrc.start(ctx.currentTime);
-            osc.stop(ctx.currentTime + duration);
         }
 
         let smoothedVolume = 0;
