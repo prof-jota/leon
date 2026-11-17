@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Caminho do Leão Silencioso</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Nunito', sans-serif;
+            overflow: hidden;
+            transition: background-color 0.5s ease;
+        }
+        h1, h2, h3, .font-title {
+            font-family: 'Fredoka One', cursive;
+        }
+
+        /* Classes de estado do fundo */
+        .bg-sleeping { background-color: #1e1b4b; } /* Indigo escuro */
+        .bg-alert { background-color: #b45309; } /* Laranja escuro / Amarelado */
+        .bg-roaring { animation: flash-red 0.3s infinite alternate; }
+
+        @keyframes flash-red {
+            from { background-color: #7f1d1d; }
+            to { background-color: #ef4444; }
+        }
+
+        /* Animação do Zzz */
+        .zzz {
+            position: absolute;
+            color: white;
+            font-family: 'Fredoka One', cursive;
+            opacity: 0;
+            animation: float-up 3s infinite ease-in;
+        }
+        .z1 { top: -20px; right: 20px; font-size: 24px; animation-delay: 0s; }
+        .z2 { top: -50px; right: -10px; font-size: 32px; animation-delay: 1s; }
+        .z3 { top: -90px; right: 10px; font-size: 40px; animation-delay: 2s; }
+
+        @keyframes float-up {
+            0% { transform: translateY(0) scale(0.5); opacity: 0; }
+            20% { opacity: 1; }
+            80% { opacity: 0.8; }
+            100% { transform: translateY(-50px) scale(1.5); opacity: 0; }
+        }
+
+        /* Tremer o leão no rugido */
+        .shake {
+            animation: shake-anim 0.1s infinite;
+        }
+        @keyframes shake-anim {
+            0% { transform: translate(2px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(0px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(2px, 1px) rotate(-1deg); }
+            80% { transform: translate(-1px, -1px) rotate(1deg); }
+            90% { transform: translate(2px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+
+        /* Transição suave da barra de som */
+        #vu-meter-fill {
+            transition: width 0.1s linear, background-color 0.2s ease;
+        }
+    </style>
+</head>
+<body class="bg-sleeping text-white h-screen w-screen flex flex-col items-center justify-center relative">
+
+    <!-- Tela Inicial -->
+    <div id="start-screen" class="absolute inset-0 bg-slate-900 bg-opacity-95 z-50 flex flex-col items-center justify-center p-6 text-center">
+        <h1 class="text-5xl md:text-7xl mb-6 text-yellow-400 drop-shadow-lg">Caminho do Leão Silencioso</h1>
+        <p class="text-xl md:text-2xl mb-8 max-w-2xl">
+            Ssshhhh! Um leão selvagem está dormindo na caverna.<br>
+            Você precisa passar em completo <b>silêncio</b>.<br>
+            Se fizer barulho, ele vai acordar!
+        </p>
+        <button id="btn-start" class="font-title text-2xl md:text-4xl bg-green-500 hover:bg-green-400 text-white py-4 px-10 rounded-full shadow-[0_10px_0_rgb(21,128,61)] active:shadow-[0_0px_0_rgb(21,128,61)] active:translate-y-[10px] transition-all cursor-pointer">
+            INICIAR ENIGMA
+        </button>
+    </div>
+
+    <!-- Interface do Jogo -->
+    <div id="game-ui" class="w-full h-full flex flex-col items-center justify-between py-10 px-4 hidden">
+        
+        <div class="text-center w-full max-w-4xl">
+            <h2 id="status-text" class="text-4xl md:text-5xl text-yellow-300 drop-shadow-md font-title mb-2">Shhh... O leão está dormindo.</h2>
+            <p class="text-lg text-gray-200">Mantenha o barulho abaixo da linha branca!</p>
+        </div>
+
+        <!-- VU Meter -->
+        <div class="w-full max-w-3xl relative mt-6 mb-10">
+            <div class="h-16 bg-gray-900 rounded-full border-4 border-gray-700 relative overflow-hidden shadow-inner">
+                <!-- Barra que enche -->
+                <div id="vu-meter-fill" class="h-full bg-green-500 w-0"></div>
+                <!-- Marcador de Limiar -->
+                <div id="threshold-marker" class="absolute top-0 bottom-0 w-2 bg-white z-10 drop-shadow-[0_0_5px_rgba(255,255,255,0.8)]" style="left: 80%;"></div>
+            </div>
+        </div>
+
+        <!-- Área do Leão -->
+        <div class="relative w-64 h-64 md:w-96 md:h-96 flex items-center justify-center">
+            
+            <!-- Animação Zzz -->
+            <div id="zzz-container" class="absolute top-0 right-0 w-full h-full pointer-events-none">
+                <span class="zzz z1">Z</span>
+                <span class="zzz z2">z</span>
+                <span class="zzz z3">z</span>
+            </div>
+
+            <!-- SVG do Leão -->
+            <div id="lion-svg-container" class="w-full h-full">
+                <!-- O SVG é atualizado dinamicamente pelo JS -->
+            </div>
+        </div>
+
+        <!-- Botão Reiniciar (Aparece apenas quando perde) -->
+        <div class="h-20 mt-8">
+            <button id="btn-restart" class="hidden font-title text-2xl bg-blue-500 hover:bg-blue-400 text-white py-3 px-8 rounded-full shadow-[0_8px_0_rgb(29,78,216)] active:shadow-[0_0px_0_rgb(29,78,216)] active:translate-y-[8px] transition-all cursor-pointer">
+                DORMIR NOVAMENTE
+            </button>
+        </div>
+    </div>
+
+    <!-- Painel de Configurações Ocultável -->
+    <div id="settings-panel" class="absolute bottom-4 right-4 bg-gray-800 p-4 rounded-xl border-2 border-gray-600 shadow-xl transition-transform transform translate-x-full opacity-0 z-40 w-72">
+        <h3 class="text-xl mb-4 text-gray-200 border-b border-gray-600 pb-2">Configurações</h3>
+        
+        <div class="mb-4">
+            <label class="block text-sm text-gray-300 mb-1">Sensibilidade do Mic (<span id="sens-val">1.0</span>x)</label>
+            <input type="range" id="mic-sensitivity" min="0.1" max="5" step="0.1" value="1" class="w-full">
+        </div>
+        
+        <div class="mb-4">
+            <label class="block text-sm text-gray-300 mb-1">Limiar de Alarme (<span id="thresh-val">80</span>%)</label>
+            <input type="range" id="alarm-threshold" min="10" max="100" step="1" value="80" class="w-full">
+        </div>
+    </div>
+
+    <!-- Botão para abrir configurações -->
+    <button id="btn-settings" class="absolute bottom-4 right-4 bg-gray-700 hover:bg-gray-600 p-3 rounded-full z-50 transition-colors" title="Configurações">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+    </button>
+
+
+    <script>
+        // SVGs Vetoriais do Leão
+        const SVGS = {
+            sleeping: `
+                <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" class="w-full h-full drop-shadow-2xl">
+                    <!-- Juba -->
+                    <circle cx="100" cy="100" r="90" fill="#d97706" />
+                    <circle cx="100" cy="100" r="85" fill="#f59e0b" stroke="#b45309" stroke-width="4" stroke-dasharray="20 10"/>
+                    <!-- Orelhas (Baixas) -->
+                    <circle cx="45" cy="70" r="15" fill="#fbbf24" stroke="#d97706" stroke-width="3" />
+                    <circle cx="155" cy="70" r="15" fill="#fbbf24" stroke="#d97706" stroke-width="3" />
+                    <!-- Rosto -->
+                    <circle cx="100" cy="110" r="60" fill="#fcd34d" />
+                    <!-- Olhos fechados -->
+                    <path d="M 70 100 Q 80 110 90 100" stroke="#78350f" stroke-width="4" fill="transparent" stroke-linecap="round"/>
+                    <path d="M 110 100 Q 120 110 130 100" stroke="#78350f" stroke-width="4" fill="transparent" stroke-linecap="round"/>
+                    <!-- Focinho e Nariz -->
+                    <ellipse cx="100" cy="130" rx="25" ry="15" fill="#fef3c7" />
+                    <path d="M 90 125 L 110 125 L 100 135 Z" fill="#451a03" />
+                    <!-- Boca suave -->
+                    <path d="M 90 138 Q 100 145 110 138" stroke="#451a03" stroke-width="2" fill="transparent" />
+                </svg>
+            `,
+            alert: `
+                <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" class="w-full h-full drop-shadow-2xl">
+                    <!-- Juba -->
+                    <circle cx="100" cy="100" r="90" fill="#d97706" />
+                    <circle cx="100" cy="100" r="85" fill="#f59e0b" stroke="#b45309" stroke-width="4" stroke-dasharray="20 10"/>
+                    <!-- Orelhas (Uma em pé) -->
+                    <circle cx="45" cy="70" r="15" fill="#fbbf24" stroke="#d97706" stroke-width="3" />
+                    <circle cx="155" cy="50" r="15" fill="#fbbf24" stroke="#d97706" stroke-width="3" /> <!-- Orelha alerta -->
+                    <!-- Rosto -->
+                    <circle cx="100" cy="110" r="60" fill="#fcd34d" />
+                    <!-- Olho fechado e Olho aberto -->
+                    <path d="M 70 100 Q 80 110 90 100" stroke="#78350f" stroke-width="4" fill="transparent" stroke-linecap="round"/>
+                    <circle cx="120" cy="100" r="10" fill="white" />
+                    <circle cx="120" cy="100" r="4" fill="#451a03" />
+                    <!-- Sobrancelha levantada -->
+                    <path d="M 110 85 L 130 80" stroke="#78350f" stroke-width="3" stroke-linecap="round"/>
+                    <!-- Focinho e Nariz -->
+                    <ellipse cx="100" cy="130" rx="25" ry="15" fill="#fef3c7" />
+                    <path d="M 90 125 L 110 125 L 100 135 Z" fill="#451a03" />
+                    <!-- Boca tensa -->
+                    <path d="M 90 140 L 110 140" stroke="#451a03" stroke-width="2" fill="transparent" />
+                </svg>
+            `,
+            roaring: `
+                <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" class="w-full h-full drop-shadow-2xl">
+                    <!-- Juba bagunçada (Simulada por forma pontiaguda ou círculo maior) -->
+                    <circle cx="100" cy="100" r="95" fill="#b45309" />
+                    <circle cx="100" cy="100" r="85" fill="#d97706" stroke="#92400e" stroke-width="6" stroke-dasharray="15 15"/>
+                    <!-- Orelhas (Em pé) -->
+                    <circle cx="40" cy="50" r="15" fill="#fbbf24" stroke="#b45309" stroke-width="3" />
+                    <circle cx="160" cy="50" r="15" fill="#fbbf24" stroke="#b45309" stroke-width="3" />
+                    <!-- Rosto -->
+                    <circle cx="100" cy="110" r="60" fill="#fbbf24" />
+                    <!-- Olhos furiosos -->
+                    <circle cx="80" cy="95" r="10" fill="white" />
+                    <circle cx="80" cy="95" r="3" fill="#451a03" />
+                    <circle cx="120" cy="95" r="10" fill="white" />
+                    <circle cx="120" cy="95" r="3" fill="#451a03" />
+                    <!-- Sobrancelhas franzidas -->
+                    <path d="M 70 80 L 90 90" stroke="#451a03" stroke-width="5" stroke-linecap="round"/>
+                    <path d="M 130 80 L 110 90" stroke="#451a03" stroke-width="5" stroke-linecap="round"/>
+                    <!-- Focinho -->
+                    <path d="M 90 115 L 110 115 L 100 125 Z" fill="#451a03" />
+                    <!-- Boca rugindo (Aberta) -->
+                    <ellipse cx="100" cy="145" rx="20" ry="25" fill="#7f1d1d" />
+                    <!-- Dentes -->
+                    <path d="M 85 135 L 90 145 L 95 135 Z" fill="white" />
+                    <path d="M 115 135 L 110 145 L 105 135 Z" fill="white" />
+                    <path d="M 85 155 L 90 145 L 95 155 Z" fill="white" />
+                    <path d="M 115 155 L 110 145 L 105 155 Z" fill="white" />
+                </svg>
+            `
+        };
+
+        // Estado do Jogo e Controles
+        let audioContext = null;
+        let analyser = null;
+        let microphone = null;
+        let dataArray = null;
+        let animationId = null;
+        let isRoaring = false;
+
+        let settings = {
+            sensitivity: 1.0,
+            threshold: 80 // 0 a 100
+        };
+
+        // Elementos DOM
+        const startScreen = document.getElementById('start-screen');
+        const btnStart = document.getElementById('btn-start');
+        const gameUi = document.getElementById('game-ui');
+        const vuMeterFill = document.getElementById('vu-meter-fill');
+        const thresholdMarker = document.getElementById('threshold-marker');
+        const lionSvgContainer = document.getElementById('lion-svg-container');
+        const zzzContainer = document.getElementById('zzz-container');
+        const statusText = document.getElementById('status-text');
+        const btnRestart = document.getElementById('btn-restart');
+        
+        const settingsPanel = document.getElementById('settings-panel');
+        const btnSettings = document.getElementById('btn-settings');
+        const inputSensitivity = document.getElementById('mic-sensitivity');
+        const inputThreshold = document.getElementById('alarm-threshold');
+        const spanSensVal = document.getElementById('sens-val');
+        const spanThreshVal = document.getElementById('thresh-val');
+
+        // Inicializa estado visual
+        lionSvgContainer.innerHTML = SVGS.sleeping;
+
+        // Toggle Painel de Configurações
+        btnSettings.addEventListener('click', () => {
+            if(settingsPanel.classList.contains('translate-x-full')) {
+                settingsPanel.classList.remove('translate-x-full', 'opacity-0');
+            } else {
+                settingsPanel.classList.add('translate-x-full', 'opacity-0');
+            }
+        });
+
+        // Atualizar configurações em tempo real
+        inputSensitivity.addEventListener('input', (e) => {
+            settings.sensitivity = parseFloat(e.target.value);
+            spanSensVal.textContent = settings.sensitivity.toFixed(1);
+        });
+
+        inputThreshold.addEventListener('input', (e) => {
+            settings.threshold = parseInt(e.target.value);
+            spanThreshVal.textContent = settings.threshold;
+            thresholdMarker.style.left = settings.threshold + '%';
+        });
+
+        // Fluxo principal de iniciar
+        btnStart.addEventListener('click', async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                startScreen.classList.add('hidden');
+                gameUi.classList.remove('hidden');
+                initAudio(stream);
+                setLionState('sleeping');
+            } catch (err) {
+                alert("Para jogar, você precisa permitir o uso do microfone no seu navegador.");
+                console.error("Erro no microfone:", err);
+            }
+        });
+
+        // Fluxo de reiniciar
+        btnRestart.addEventListener('click', () => {
+            isRoaring = false;
+            setLionState('sleeping');
+            btnRestart.classList.add('hidden');
+            document.body.className = "bg-sleeping text-white h-screen w-screen flex flex-col items-center justify-center relative";
+            updateGameLoop(); // Retoma o loop
+        });
+
+        function initAudio(stream) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            analyser = audioContext.createAnalyser();
+            analyser.fftSize = 256; 
+            microphone = audioContext.createMediaStreamSource(stream);
+            microphone.connect(analyser);
+            
+            const bufferLength = analyser.frequencyBinCount;
+            dataArray = new Uint8Array(bufferLength);
+            
+            updateGameLoop();
+        }
+
+        function playSynthesizedRoar() {
+            if(!audioContext) return;
+            
+            const ctx = audioContext;
+            const duration = 2.0;
+
+            // 1. Oscilador para o som grave (Sawtooth)
+            const osc = ctx.createOscillator();
+            osc.type = 'sawtooth';
+            // Frequência caindo rapidamente para simular o rugido gutural
+            osc.frequency.setValueAtTime(90, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(30, ctx.currentTime + 1.5);
+
+            const oscGain = ctx.createGain();
+            oscGain.gain.setValueAtTime(0, ctx.currentTime);
+            oscGain.gain.linearRampToValueAtTime(2.0, ctx.currentTime + 0.1); // Attack
+            oscGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration); // Decay
+
+            osc.connect(oscGain).connect(ctx.destination);
+            
+            // 2. Ruído (White Noise) filtrado para adicionar textura de respiração/rasgado
+            const bufferSize = ctx.sampleRate * duration;
+            const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+            const output = noiseBuffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                output[i] = Math.random() * 2 - 1;
+            }
+            
+            const noiseSrc = ctx.createBufferSource();
+            noiseSrc.buffer = noiseBuffer;
+            
+            const noiseFilter = ctx.createBiquadFilter();
+            noiseFilter.type = 'lowpass';
+            noiseFilter.frequency.setValueAtTime(600, ctx.currentTime);
+            noiseFilter.frequency.linearRampToValueAtTime(100, ctx.currentTime + duration);
+
+            const noiseGain = ctx.createGain();
+            noiseGain.gain.setValueAtTime(0, ctx.currentTime);
+            noiseGain.gain.linearRampToValueAtTime(1.5, ctx.currentTime + 0.1);
+            noiseGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
+
+            noiseSrc.connect(noiseFilter).connect(noiseGain).connect(ctx.destination);
+
+            // Tocar ambos
+            osc.start(ctx.currentTime);
+            noiseSrc.start(ctx.currentTime);
+            osc.stop(ctx.currentTime + duration);
+        }
+
+        let smoothedVolume = 0;
+
+        function updateGameLoop() {
+            if (isRoaring) return; // Trava o loop se o leão acordou
+
+            analyser.getByteFrequencyData(dataArray);
+            
+            // Calcula o volume médio
+            let sum = 0;
+            for (let i = 0; i < dataArray.length; i++) {
+                sum += dataArray[i];
+            }
+            let average = sum / dataArray.length;
+            
+            // Mapeia para 0-100 e aplica sensibilidade
+            // (255 é o max teórico, mas sons normais ficam bem abaixo)
+            let rawVolume = (average / 150) * 100 * settings.sensitivity; 
+            
+            // Suavização do movimento da barra (easing)
+            smoothedVolume += (rawVolume - smoothedVolume) * 0.2;
+            
+            let displayVolume = Math.min(Math.max(smoothedVolume, 0), 100);
+
+            // Atualiza VU Meter visual
+            vuMeterFill.style.width = displayVolume + '%';
+
+            // Cores do medidor
+            if (displayVolume < settings.threshold * 0.5) {
+                vuMeterFill.className = "h-full bg-green-500 transition-all duration-100 ease-out";
+            } else if (displayVolume < settings.threshold) {
+                vuMeterFill.className = "h-full bg-yellow-400 transition-all duration-100 ease-out";
+            } else {
+                vuMeterFill.className = "h-full bg-red-600 transition-all duration-100 ease-out";
+            }
+
+            // Lógica de Estados
+            if (displayVolume >= settings.threshold) {
+                triggerRoar();
+            } else if (displayVolume >= settings.threshold * 0.75) {
+                setLionState('alert');
+            } else {
+                setLionState('sleeping');
+            }
+
+            animationId = requestAnimationFrame(updateGameLoop);
+        }
+
+        function setLionState(state) {
+            if (isRoaring) return; // Se estiver rugindo, ignora outros estados
+
+            const bodyClass = document.body;
+
+            if (state === 'sleeping') {
+                if (lionSvgContainer.innerHTML !== SVGS.sleeping) {
+                    lionSvgContainer.innerHTML = SVGS.sleeping;
+                    bodyClass.className = "bg-sleeping text-white h-screen w-screen flex flex-col items-center justify-center relative";
+                    zzzContainer.style.display = 'block';
+                    lionSvgContainer.classList.remove('shake');
+                    statusText.textContent = "Shhh... O leão está dormindo.";
+                    statusText.className = "text-4xl md:text-5xl text-yellow-300 drop-shadow-md font-title mb-2";
+                }
+            } else if (state === 'alert') {
+                if (lionSvgContainer.innerHTML !== SVGS.alert) {
+                    lionSvgContainer.innerHTML = SVGS.alert;
+                    bodyClass.className = "bg-alert text-white h-screen w-screen flex flex-col items-center justify-center relative";
+                    zzzContainer.style.display = 'none';
+                    lionSvgContainer.classList.remove('shake');
+                    statusText.textContent = "Cuidado! Ele está escutando...";
+                    statusText.className = "text-4xl md:text-5xl text-white drop-shadow-md font-title mb-2";
+                }
+            }
+        }
+
+        function triggerRoar() {
+            isRoaring = true; // Trava o estado
+            cancelAnimationFrame(animationId);
+            
+            // Visual
+            lionSvgContainer.innerHTML = SVGS.roaring;
+            document.body.className = "bg-roaring text-white h-screen w-screen flex flex-col items-center justify-center relative";
+            zzzContainer.style.display = 'none';
+            lionSvgContainer.classList.add('shake');
+            vuMeterFill.style.width = '100%';
+            vuMeterFill.className = "h-full bg-red-600";
+            
+            statusText.textContent = "VOCÊ ACORDOU O LEÃO!";
+            statusText.className = "text-5xl md:text-7xl text-white drop-shadow-2xl font-title mb-2 scale-110 transition-transform";
+
+            // Som
+            playSynthesizedRoar();
+
+            // Mostra botão de reiniciar após 1 segundo
+            setTimeout(() => {
+                btnRestart.classList.remove('hidden');
+            }, 1000);
+        }
+
+    </script>
+</body>
+</html>
